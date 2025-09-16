@@ -1,4 +1,5 @@
 const std = @import("std");
+const module = @import("utils/utils.zig");
 const builtin = @import("builtin");
 const print = std.debug.print;
 /// Variable Basics
@@ -82,7 +83,7 @@ fn run_vs_comp() !void {
 
     // --- Runtime known slice ---
     // Reads the entire file contents into heap-allocated memory.
-    const file_contents = try read_file(allocater, path);
+    const file_contents = try module.read_file(allocater, path);
 
     // Here we form a slice using runtime information:
     // file_contents.len is not known until the file is actually read.
@@ -95,36 +96,11 @@ fn run_vs_comp() !void {
     try stdout.flush(); // Don't forget to flush buffered writer
 }
 
-/// Helper: read a file into heap-allocated memory
-fn read_file(allocater: std.mem.Allocator, path: []const u8) ![]u8 {
-    // Temporary stack buffer for the file reader
-    var read_buffer: [1024]u8 = undefined;
-
-    // Allocate heap memory for up to 1024 bytes of file contents
-    var file_buffer = try allocater.alloc(u8, 1024);
-
-    // Initialize memory to zero (safety: avoids garbage data)
-    @memset(file_buffer[0..], 0);
-
-    // Open the file from the current working directory
-    const file = try std.fs.cwd().openFile(path, .{});
-    defer file.close();
-
-    // Create a reader using our temporary stack buffer
-    var reader = file.reader(read_buffer[0..]);
-
-    // Read up to 1024 bytes into file_buffer
-    const n_bytes = try reader.read(file_buffer[0..]);
-
-    // Return a slice representing only the bytes actually read
-    return file_buffer[0..n_bytes];
-}
-
-///You can create blocks within blocks, with multiple levels of nesting.
+/// You can create blocks within blocks, with multiple levels of nesting.
 /// You can also (if you want to) give a label to a particular block, with the colon character `(:)`.
 /// Just write `label:` before you open the pair of curly braces that delimits your block.
 /// When you label a block in Zig, you can use the break keyword to return a value from this block, like as if it was a function’s body.
-///You just write the break keyword, followed by the block label in the format `:label`, and the expression that defines the value that you want to return.
+/// You just write the break keyword, followed by the block label in the format `:label`, and the expression that defines the value that you want to return.
 fn block_scope() !void {
     // --- Setup for buffered stdout writer ---
     var stdout_buffer: [64]u8 = undefined;
@@ -158,14 +134,14 @@ fn strings_basics() !void {
     //  “Hello”. In UTF-8,
     // is represented by the sequence of decimal numbers 72, 101, 108, 108, 111.
     // In hexadecimal, this sequence is 0x48, 0x65, 0x6C, 0x6C, 0x6F.
-    const bytes = [_]u8{ 0x48, 0x65, 0x6C, 0x6C, 0x6F };
+    const bytes = [5]u8{ 0x48, 0x65, 0x6C, 0x6C, 0x6F };
     try stdout.print("Number of elements in the array: {d}\n", .{array.len});
     try stdout.print("{s}\n", .{bytes});
     try stdout.flush(); //Dont forget to flush
 }
 /// This is a string value being
 /// interpreted as a slice.
-fn str_slice() !void {
+fn string_slices() !void {
     // --- Setup for buffered stdout writer ---
     var stdout_buffer: [64]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
@@ -247,7 +223,7 @@ fn complex_unicode_chars() !void {
 }
 
 /// Useful functions for strings
-fn str_ops() !void {
+fn useful_string_operations() !void {
     // --- Setup for buffered stdout writer ---
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
@@ -259,10 +235,15 @@ fn str_ops() !void {
 
     const instance: []const u8 = "Pedro";
     const second: []const u8 = "Pascal";
-    const slices = [_][]const u8{ instance, " ", second };
+    const sequence: []const u8 = "Sequence|Char";
+
+    const slices = [3][]const u8{ instance, " ", second };
     const concat = try std.mem.concat(allocator, u8, &slices);
+
     var repl_buffer: [5]u8 = undefined;
-    const new_rep = std.mem.replace(u8, instance, "e", "3", &repl_buffer);
+    const new_rep = std.mem.replace(u8, instance, "ed", "34", &repl_buffer);
+    const split_chars = std.mem.splitSequence(u8, sequence, "|");
+
     // compare if two strings are equal
     try stdout.print("Does instance equal 'Pedro': {}\n", .{std.mem.eql(u8, instance, "Pedro")});
     // check if string starts with substring.
@@ -270,25 +251,30 @@ fn str_ops() !void {
     // check if string ends with substring.
     try stdout.print("Does Instance end with 'o': {}\n", .{std.mem.endsWith(u8, instance, "o")});
     // concatenate strings together.
-    try stdout.print("Concatenated string: {s}\n", .{concat});
+    try stdout.print("Concatenated string: '{s}'\n", .{concat});
     // count the occurrences of substring
-    try stdout.print("Occurences of 'P' in concat= {d}\n", .{std.mem.count(u8, concat, "P")});
+    try stdout.print("Occurences of 'P' in concat = {d}\n", .{std.mem.count(u8, concat, "P")});
     // replace the occurrences of substring in the string.
     try stdout.print("New string: {s}\n", .{repl_buffer});
     try stdout.print("Number of replacements: {d}\n", .{new_rep});
+    // split a string into an array of substrings given a substring delimiter.
+    try stdout.print("Split {s}\n", .{split_chars.buffer});
     try stdout.flush(); //Dont forget to flush
 }
 pub fn main() !void {
-    // variables();
-    // try arrays_basics();
-    // try array_ops();
-    // try run_vs_comp();
-    // try block_scope();
-    // try strings_basics();
-    // try str_slice();
-    // try string_indexing();
-    // inspect_objects();
-    // unicode_chars_basics();
-    // try complex_unicode_chars();
-    try str_ops();
+    switch (@as(i32, 1)) {
+        0x1 => variables(),
+        0x2 => try arrays_basics(),
+        0x3 => try array_ops(),
+        0x4 => try run_vs_comp(),
+        0x5 => try block_scope(),
+        0x6 => try strings_basics(),
+        0x7 => try string_slices(),
+        0x8 => try string_indexing(),
+        0x9 => inspect_objects(),
+        0xA => unicode_chars_basics(),
+        0xB => try complex_unicode_chars(),
+        0xC => try useful_string_operations(),
+        else => unreachable,
+    }
 }
