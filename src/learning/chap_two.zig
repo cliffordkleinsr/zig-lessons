@@ -9,11 +9,10 @@ fn ctrl_flow_basics() !void {
     const x: i32 = 5;
     if (x > 10) {
         try stdout.print("x > 10\n", .{});
-        try stdout.flush(); //Dont forget!
     } else {
         try stdout.print("x < 10\n", .{});
-        try stdout.flush(); //Dont forget!
     }
+    try stdout.flush(); //Dont forget to flush
 }
 
 /// switch must handle all possibilities
@@ -57,7 +56,7 @@ fn switch_statements() !void {
 
     try stdout.print("{s}\n", .{area});
     try stdout.print("{s}\n", .{category});
-    try stdout.flush(); //Dont forget!
+    try stdout.flush(); //Dont forget to flush
 }
 
 fn labaled_switch_statements() !void {
@@ -68,19 +67,17 @@ fn labaled_switch_statements() !void {
     xsw: switch (@as(u8, 1)) {
         1 => {
             try stdout.print("First branch\n", .{});
-            try stdout.flush(); // Dont!
             continue :xsw 2;
         },
         2 => continue :xsw 3,
         3 => {
             try stdout.print("Ended here\n", .{});
-            try stdout.flush(); // Dont!
+            try stdout.flush(); //Dont forget to flush
             return;
         },
         4 => {},
         else => {
             try stdout.print("Unmatched case {d}\n", .{@as(u8, 1)});
-            try stdout.flush(); // Dont!
         },
     }
 }
@@ -115,7 +112,7 @@ fn errdefer_keyword() !void {
     try foo();
 }
 
-///  Instead of using a (value in items) syntax, in Zig, for loops use the syntax (items) |value|.
+///  With For loops Instead of using a (value in items) syntax like in python, in Zig, for loops use the syntax (items) |value|.
 ///  In the example below, you can see that we are looping through the items of the array stored at the object name
 fn for_loops() !void {
     var std_buffer: [48]u8 = undefined;
@@ -135,7 +132,7 @@ fn for_loops() !void {
     for (joined, 0..) |_, i| {
         try stdout.print("{d} | ", .{i});
     }
-    try stdout.flush(); // Dont!
+    try stdout.flush(); //Dont forget to flush
 }
 
 ///  A for loop iterates through the items of an array,
@@ -169,6 +166,7 @@ fn modifying_loops() !void {
             break;
         }
     }
+    try stdout.print("New value of i: {d}\n", .{i});
     // The if statement is constantly checking if the current index is a multiple of 2. If it is, we jump to the next iteration of the loop.
     for (ns) |byte| {
         if ((byte % 2) == 0) {
@@ -177,8 +175,6 @@ fn modifying_loops() !void {
         try stdout.print("{d} | ", .{byte});
     }
 
-    try stdout.print("\n", .{});
-    try stdout.print("New value of i: {d}\n", .{i});
     try stdout.flush();
 }
 
@@ -199,7 +195,7 @@ fn functions_are_immutable() !void {
 }
 
 pub fn main() !void {
-    switch (@as(i32, 9)) {
+    switch (@as(i32, 0x9)) {
         0x1 => try ctrl_flow_basics(),
         0x2 => try switch_statements(),
         0x3 => try labaled_switch_statements(),

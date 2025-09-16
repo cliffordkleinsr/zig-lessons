@@ -1,10 +1,14 @@
 const std = @import("std");
-const module = @import("utils/utils.zig");
-const builtin = @import("builtin");
+const read_file = @import("utils/utils.zig").read_file;
+
 const print = std.debug.print;
 /// Variable Basics
-fn variables() void {
-    // mutable variab;es
+fn variables() !void {
+    // --- Setup for buffered stdout writer ---
+    var stdout_buffer: [64]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+    // mutable variables
     var num: u8 = 0;
     // immutable variables
     const age: u8 = 20;
@@ -12,7 +16,8 @@ fn variables() void {
     _ = age;
     // var kimiki = "I am kimiki"; //mutable variables must be used
     num = 30;
-    print("My num is {d}\n", .{num});
+    try stdout.print("My num is {d}\n", .{num});
+    try stdout.flush(); //Dont forget to flush
 }
 
 /// Array Basics
@@ -83,7 +88,7 @@ fn run_vs_comp() !void {
 
     // --- Runtime known slice ---
     // Reads the entire file contents into heap-allocated memory.
-    const file_contents = try module.read_file(allocater, path);
+    const file_contents = try read_file(allocater, path);
 
     // Here we form a slice using runtime information:
     // file_contents.len is not known until the file is actually read.
@@ -114,8 +119,8 @@ fn block_scope() !void {
     };
     if (x == 121 and y == 121) {
         try stdout.print("Hey!", .{});
-        try stdout.flush();
     }
+    try stdout.flush(); //Dont forget to flush
 }
 /// in zig a string is essentially an array of bytes
 /// To achieve this same kind of safety in C,
@@ -168,13 +173,20 @@ fn string_indexing() !void {
 }
 
 /// To check the type of any object in Zig, you can use the @TypeOf() function.
-fn inspect_objects() void {
+fn inspect_objects() !void {
+    // --- Setup for buffered stdout writer ---
+    var stdout_buffer: [64]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
     const simple_array = [4]i32{ 1, 2, 3, 4 };
     const str_obj: []const u8 = "A string Object";
 
-    print("Type of simple_array {}\n", .{@TypeOf(simple_array)});
-    print("Type of simple_obj {}\n", .{@TypeOf(str_obj)});
-    print("Type of pointer to simple_array {}\n", .{@TypeOf(&simple_array)});
+    try stdout.print("Type of simple_array {}\n", .{@TypeOf(simple_array)});
+    try stdout.print("Type of simple_obj {}\n", .{@TypeOf(str_obj)});
+    try stdout.print("Type of pointer to simple_array {}\n", .{@TypeOf(&simple_array)});
+
+    try stdout.flush(); // Dont forget to flush
 }
 
 /// All english letters (or ASCII letters if you prefer) can be
@@ -183,15 +195,21 @@ fn inspect_objects() void {
 /// you might be working with text data that contains, chinese, japanese or latin letters,
 /// then, the number of bytes necessary to represent your UTF-8 string will
 /// likely be much higher than the number of characters in that string.
-fn unicode_chars_basics() void {
+fn unicode_chars_basics() !void {
+    // --- Setup for buffered stdout writer ---
+    var stdout_buffer: [64]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
     const char: []const u8 = "Ⱥ";
     // the Latin Capital Letter A With Stroke (Ⱥ) is represented by the number 570
     // which  is higher than the maximum number stored inside a single byte, which is 255.
     // That is why, the unicode point 570 is actually stored inside the computer’s memory as the bytes C8 BA.
-    print("Hex upper value of char:  ", .{});
+    try stdout.print("Hex upper value of char:  ", .{});
     for (char) |byte| {
-        print("{X} ", .{byte});
+        try stdout.print("{X} ", .{byte});
     }
+    try stdout.flush(); // Dont forget to flush
     // if your UTF-8 string contains only english letters (or ASCII letters),
     // then, you are lucky. Because the number of bytes will be equal to
     // the number of characters in that string.
@@ -262,8 +280,8 @@ fn useful_string_operations() !void {
     try stdout.flush(); //Dont forget to flush
 }
 pub fn main() !void {
-    switch (@as(i32, 1)) {
-        0x1 => variables(),
+    switch (@as(i32, 0xA)) {
+        0x1 => try variables(),
         0x2 => try arrays_basics(),
         0x3 => try array_ops(),
         0x4 => try run_vs_comp(),
@@ -271,8 +289,8 @@ pub fn main() !void {
         0x6 => try strings_basics(),
         0x7 => try string_slices(),
         0x8 => try string_indexing(),
-        0x9 => inspect_objects(),
-        0xA => unicode_chars_basics(),
+        0x9 => try inspect_objects(),
+        0xA => try unicode_chars_basics(),
         0xB => try complex_unicode_chars(),
         0xC => try useful_string_operations(),
         else => unreachable,
