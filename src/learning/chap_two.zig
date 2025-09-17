@@ -230,6 +230,12 @@ const Vec3 = struct {
 
         return std.math.sqrt(xd + yd + zd);
     }
+
+    fn twice(self: *Vec3) void {
+        self.x = self.x * 2;
+        self.y = self.y * 2;
+        self.z = self.z * 2;
+    }
 };
 /// Structs & OOP
 /// In Zig, we normally declare the constructor and the destructor methods of our structs, by declaring an init() and a deinit() methods inside the struct.
@@ -251,16 +257,24 @@ fn zig_structs() !void {
     // Struct declarations must be constant
     const vec1 = Vec3.init(0.1, 0.0, 0.1);
     const vec2 = Vec3.init(0.1012, 0.0006, 0.0989);
+
     const dot = vec1.dot_product(vec2);
 
     const eucledian_distance = vec1.distance(vec2);
+
     try usr.print_name(stdout);
     try eu.print_name(stdout);
     try ca.print_name(stdout);
 
     try stdout.print("Dot product of vec1 & vec 2 = {d}\n", .{dot});
     try stdout.print("Eucleadian distance of vec1 & vec2 = {d}\n", .{eucledian_distance});
-
+    // About the struct state
+    // what if we do have a method that alters the state of the object, by altering the values of its data members,
+    // how should we annotate self in this instance? The answer is: “we should annotate self as a pointer of x, instead of just x”.
+    // In other words, you should annotate self as self: *x, instead of annotating it as self: x.
+    var vec3 = Vec3.init(4.2, 2.4, 0.9);
+    vec3.twice();
+    try stdout.print("twice vec3 {}", .{vec3});
     try stdout.flush();
 }
 
