@@ -5,7 +5,7 @@ const print = std.debug.print;
 /// Variable Basics
 fn variables() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
     // mutable variables
@@ -23,14 +23,14 @@ fn variables() !void {
 /// Array Basics
 fn arrays_basics() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    const ns = [4]u8{ 48, 24, 64, 96 }; //you assert array size
+    const ns = [0x4]u8{ 48, 24, 64, 96 }; //you assert array size
     const ls = [_]f64{ 0.05, 0.800, 55.9 }; //compiler asserts array size
     const sl = ls[1..];
-    const unar = [2]i32{ 2, 6 };
+    const unar = [0x2]i32{ 2, 6 };
     _ = unar; //discareded array
 
     print("My Array = {any}\n", .{ns});
@@ -46,15 +46,15 @@ fn arrays_basics() !void {
 /// Array operators (++) & (**)
 fn array_ops() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    const fas = [3]u8{ 10, 20, 30 };
-    const sec = [4]i32{ -22, 11, -44, 55 };
+    const fas = [0x3]u8{ 10, 20, 30 };
+    const sec = [0x4]i32{ -22, 11, -44, 55 };
 
     const las = fas ++ sec;
-    const ori = [3]i32{ 2, 4, 7 };
+    const ori = [0x3]i32{ 2, 4, 7 };
     const rep = ori ** 3;
 
     try stdout.print("Concatenated Array = {any}\n", .{las}); // concatenates as long as they are of integer type despite bitwise length (best use case is to concat strings)
@@ -67,7 +67,7 @@ fn array_ops() !void {
 /// Demonstrates runtime versus compile-time known length in slices
 fn run_vs_comp() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
@@ -108,11 +108,11 @@ fn run_vs_comp() !void {
 /// You just write the break keyword, followed by the block label in the format `:label`, and the expression that defines the value that you want to return.
 fn block_scope() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    var y: i32 = 120;
+    var y: i32 = 0x78;
     const x = add_one: { //label to this particular block
         y += 1;
         break :add_one y;
@@ -131,7 +131,7 @@ fn block_scope() !void {
 /// accessible in the string value itself.
 fn strings_basics() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
@@ -139,7 +139,7 @@ fn strings_basics() !void {
     //  “Hello”. In UTF-8,
     // is represented by the sequence of decimal numbers 72, 101, 108, 108, 111.
     // In hexadecimal, this sequence is 0x48, 0x65, 0x6C, 0x6C, 0x6F.
-    const bytes = [5]u8{ 0x48, 0x65, 0x6C, 0x6C, 0x6F };
+    const bytes = [0x5]u8{ 0x48, 0x65, 0x6C, 0x6C, 0x6F };
     try stdout.print("Number of elements in the array: {d}\n", .{array.len});
     try stdout.print("{s}\n", .{bytes});
     try stdout.flush(); //Dont forget to flush
@@ -148,7 +148,7 @@ fn strings_basics() !void {
 /// interpreted as a slice.
 fn string_slices() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
@@ -160,7 +160,7 @@ fn string_slices() !void {
 
 fn string_indexing() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
@@ -175,7 +175,7 @@ fn string_indexing() !void {
 /// To check the type of any object in Zig, you can use the @TypeOf() function.
 fn inspect_objects() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
@@ -197,7 +197,7 @@ fn inspect_objects() !void {
 /// likely be much higher than the number of characters in that string.
 fn unicode_chars_basics() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [64]u8 = undefined;
+    var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
@@ -222,7 +222,7 @@ fn unicode_chars_basics() !void {
 // of your string.
 fn complex_unicode_chars() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_buffer: [0x400]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
@@ -243,11 +243,11 @@ fn complex_unicode_chars() !void {
 /// Useful functions for strings
 fn useful_string_operations() !void {
     // --- Setup for buffered stdout writer ---
-    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_buffer: [0x400]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
     // --- Allocator setup ---
-    var alloc_buffer: [1024]u8 = undefined;
+    var alloc_buffer: [0x400]u8 = undefined;
     var fba = std.heap.FixedBufferAllocator.init(&alloc_buffer);
     const allocator = fba.allocator();
 
@@ -255,10 +255,10 @@ fn useful_string_operations() !void {
     const second: []const u8 = "Pascal";
     const sequence: []const u8 = "Sequence|Char";
 
-    const slices = [3][]const u8{ instance, " ", second };
+    const slices = [0x3][]const u8{ instance, " ", second };
     const concat = try std.mem.concat(allocator, u8, &slices);
 
-    var repl_buffer: [5]u8 = undefined;
+    var repl_buffer: [0x5]u8 = undefined;
     const new_rep = std.mem.replace(u8, instance, "ed", "34", &repl_buffer);
     const split_chars = std.mem.splitSequence(u8, sequence, "|");
 

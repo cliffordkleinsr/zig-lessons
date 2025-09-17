@@ -1,8 +1,9 @@
 const std = @import("std");
+const User = @import("structs/user.zig").User;
 const print = std.debug.print;
 
 fn ctrl_flow_basics() !void {
-    var std_buffer: [48]u8 = undefined;
+    var std_buffer: [0x30]u8 = undefined;
     var std_writer = std.fs.File.stdout().writer(&std_buffer);
     const stdout = &std_writer.interface;
 
@@ -18,7 +19,7 @@ fn ctrl_flow_basics() !void {
 /// switch must handle all possibilities
 /// This is what “exhaust all existing possibilities” means.
 fn switch_statements() !void {
-    var std_buffer: [48]u8 = undefined;
+    var std_buffer: [0x30]u8 = undefined;
     var std_writer = std.fs.File.stdout().writer(&std_buffer);
     const stdout = &std_writer.interface;
 
@@ -40,7 +41,7 @@ fn switch_statements() !void {
     }
 
     // using ranges in switch statements
-    const level: i32 = 1;
+    const level: i32 = 0x1;
 
     const category = switch (level) {
         0...25 => "beginner",
@@ -60,7 +61,7 @@ fn switch_statements() !void {
 }
 
 fn labaled_switch_statements() !void {
-    var std_buffer: [48]u8 = undefined;
+    var std_buffer: [0x30]u8 = undefined;
     var std_writer = std.fs.File.stdout().writer(&std_buffer);
     const stdout = &std_writer.interface;
 
@@ -82,8 +83,10 @@ fn labaled_switch_statements() !void {
     }
 }
 
+/// Zig has a `defer` keyword, which plays a very important role in control flow, and also, in releasing resources.
+/// In summary, the `defer` keyword allows you to register an expression to be executed when you exit the current scope.
 fn defer_keyword() !void {
-    var std_buffer: [48]u8 = undefined;
+    var std_buffer: [0x30]u8 = undefined;
     var std_writer = std.fs.File.stdout().writer(&std_buffer);
     const stdout = &std_writer.interface;
 
@@ -138,14 +141,14 @@ fn for_loops() !void {
 ///  A for loop iterates through the items of an array,
 ///  but a while loop will loop continuously, and infinitely, until a logical test (specified by you) becomes false.
 fn while_loops() !void {
-    var std_buffer: [48]u8 = undefined;
+    var std_buffer: [0x30]u8 = undefined;
     var std_writer = std.fs.File.stdout().writer(&std_buffer);
     const stdout = &std_writer.interface;
 
-    var i: u8 = 1;
+    var i: u8 = 0x1;
     // You can also specify the increment expression to be used at the beginning of a while loop.
     // This can be acheived by writing the increment expression inside a pair of parentheses after a colon character (:)
-    while (i < 5) : (i += 1) {
+    while (i < 0x5) : (i += 0x1) {
         try stdout.print("{d} | ", .{i});
         // i += 1;
     }
@@ -194,8 +197,75 @@ fn functions_are_immutable() !void {
     print("{d}", .{y});
 }
 
+/// How to overcome this barrier
+/// There are some situations where you might need to change the value of your function argument directly inside the function’s body.
+/// This happens more often when we are passing C structs as inputs to Zig functions.
+fn add2(x: *u32) void {
+    x.* = x.* + 0x2;
+}
+fn how_to_modify_immutability() !void {
+    var x: u32 = 0x4;
+    add2(&x);
+    print("{d}", .{x});
+}
+
+const Vec3 = struct {
+    x: f64,
+    y: f64,
+    z: f64,
+
+    fn init(x: f64, y: f64, z: f64) Vec3 {
+        return Vec3{ .x = x, .y = y, .z = z };
+    }
+
+    fn dot_product(self: Vec3, other: Vec3) f64 {
+        return self.x * other.x + self.y * other.y + self.z * other.z;
+    }
+
+    /// This method calculates the distance between two Vec3 objects, by following the distance formula in euclidean space.
+    fn distance(self: Vec3, other: Vec3) f64 {
+        const xd = std.math.pow(f64, self.x - other.x, 2);
+        const yd = std.math.pow(f64, self.y - other.y, 2);
+        const zd = std.math.pow(f64, self.z - other.z, 2);
+
+        return std.math.sqrt(xd + yd + zd);
+    }
+};
+/// Structs & OOP
+/// In Zig, we normally declare the constructor and the destructor methods of our structs, by declaring an init() and a deinit() methods inside the struct.
+/// Structs should be globally scoped
+fn zig_structs() !void {
+    var std_buffer: [0x30]u8 = undefined;
+    var std_writer = std.fs.File.stdout().writer(&std_buffer);
+    const stdout = &std_writer.interface;
+    // This `init()` method is the constructor method that we will use to instantiate every new User object.
+    // That is why this `init()` function returns a new User object as result.
+    const usr = User.init(0x1, "Babana", "babanalemmings@gmail.com");
+    // You can declare a struct object as a literal value.
+    // When we do that, we normally specify the data type of this struct literal by writing its data type just before the opening curly brace.
+    const eu = User{ .id = 0x2, .name = "Pedro", .email = "someemail@gmail.com" };
+    // In Zig, we can also write an anonymous struct literal.
+    // That is, you can write a struct literal, but not specify explicitly the type of this particular struct.
+    // An anonymous struct is written by using the syntax `.{}`.
+    const ca: User = .{ .id = 0x3, .name = "Johnny", .email = "johndoe@gmail.com" };
+    // Struct declarations must be constant
+    const vec1 = Vec3.init(0.1, 0.0, 0.1);
+    const vec2 = Vec3.init(0.1012, 0.0006, 0.0989);
+    const dot = vec1.dot_product(vec2);
+
+    const eucledian_distance = vec1.distance(vec2);
+    try usr.print_name(stdout);
+    try eu.print_name(stdout);
+    try ca.print_name(stdout);
+
+    try stdout.print("Dot product of vec1 & vec 2 = {d}\n", .{dot});
+    try stdout.print("Eucleadian distance of vec1 & vec2 = {d}\n", .{eucledian_distance});
+
+    try stdout.flush();
+}
+
 pub fn main() !void {
-    switch (@as(i32, 0x9)) {
+    switch (@as(i32, 0xB)) {
         0x1 => try ctrl_flow_basics(),
         0x2 => try switch_statements(),
         0x3 => try labaled_switch_statements(),
@@ -205,6 +275,8 @@ pub fn main() !void {
         0x7 => try while_loops(),
         0x8 => try modifying_loops(),
         0x9 => try functions_are_immutable(),
+        0xA => try how_to_modify_immutability(),
+        0xB => try zig_structs(),
         else => unreachable,
     }
 }
