@@ -23,15 +23,3 @@ pub fn read_file(allocater: std.mem.Allocator, path: []const u8) ![]u8 {
     // Return a slice representing only the bytes actually read
     return file_buffer[0..n_bytes];
 }
-
-/// Stdout is for the actual output of your application, for example if you
-/// are implementing gzip, then only the compressed bytes should be sent to
-/// stdout, not any debugging messages.
-pub fn println(comptime fmt: []const u8, args: anytype) !void {
-    var std_buffer: [64]u8 = undefined;
-    var std_writer = std.fs.File.stdout().writer(&std_buffer);
-    const stdout = &std_writer.interface;
-
-    try stdout.print(fmt, args);
-    try stdout.flush(); //Dont forget to flush
-}
