@@ -65,7 +65,7 @@ fn array_ops() !void {
 }
 
 /// Demonstrates runtime versus compile-time known length in slices
-fn run_vs_comp() !void {
+fn comptime_vs_runtime() !void {
     // --- Setup for buffered stdout writer ---
     var stdout_buffer: [0x40]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
@@ -284,7 +284,7 @@ pub fn main() !void {
         0x1 => try variables(),
         0x2 => try arrays_basics(),
         0x3 => try array_ops(),
-        0x4 => try run_vs_comp(),
+        0x4 => try comptime_vs_runtime(),
         0x5 => try block_scope(),
         0x6 => try strings_basics(),
         0x7 => try string_slices(),
