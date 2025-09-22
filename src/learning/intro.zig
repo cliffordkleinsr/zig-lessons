@@ -73,6 +73,7 @@ fn comptime_vs_runtime() !void {
 
     // --- Allocator setup ---
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
+    // defer std.debug.assert(gpa.deinit() == .ok);
     const allocater = gpa.allocator();
 
     // --- Compile-time known slice ---
@@ -280,7 +281,7 @@ fn useful_string_operations() !void {
     try stdout.flush(); //Dont forget to flush
 }
 pub fn main() !void {
-    switch (@as(i32, 0xA)) {
+    switch (@as(i32, 0x4)) {
         0x1 => try variables(),
         0x2 => try arrays_basics(),
         0x3 => try array_ops(),

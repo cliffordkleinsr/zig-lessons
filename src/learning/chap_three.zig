@@ -167,13 +167,38 @@ fn stack_overflow() !void {
 /// then, this function/operator needs to receive (as input) an allocator provided by the user, to actually be able to allocate the memory it needs.
 ///
 /// This creates a clear distinction between functions that **“do not”** from those that **“actually do”** allocate memory.
-/// An example is the allocPrint() function from the Zig Standard Library.
-/// With this function, you can write a new string using format specifiers. So, this function is, for example, very similar to the function sprintf() in C.
+/// An example is the `allocPrint()` function from the Zig Standard Library.
+/// With this function, you can write a new string using format specifiers. So, this function is, for example, very similar to the function `sprintf()` in C.
+/// In order to write such a new string, the `allocPrint()` function needs to allocate some memory to store the output string.
+///
+/// That is why, the first argument of this function is an allocator object that you, the user/programmer, gives as input to the function.
+/// In the example below, we use the `GeneralPurposeAllocator()` as an allocator object.
+/// But we could easily use any other type of allocator object from the Zig Standard Library.
+///
+/// You get a lot of control over where and how much memory this function can allocate.
+/// Because it is you, the user/programmer, that provides the allocator for the function to use.
+/// This makes “total control” over memory management easier to achieve in Zig.
+fn allocated_printer() !void {
+    var std_buffer: [0x40]u8 = undefined;
+    var std_writer = std.fs.File.stdout().writer(&std_buffer);
+    const stdout = &std_writer.interface;
+    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
+    defer std.debug.assert(gpa.deinit() == .ok);
+    const allocator = gpa.allocator();
+
+    const name: []const u8 = "Babana";
+
+    const output = try std.fmt.allocPrint(allocator, "Hello {s}\n", .{name}); //allocates a heap buffer.
+    defer allocator.free(output); // releases it.
+    try stdout.print("{s}", .{output});
+    try stdout.flush();
+}
 pub fn main() !void {
-    switch (@as(i32, 0x3)) {
+    switch (@as(i32, 0x4)) {
         0x1 => try comptime_known(),
         0x2 => try stack_memory(),
         0x3 => try stack_overflow(),
+        0x4 => try allocated_printer(),
         else => unreachable,
     }
 }
