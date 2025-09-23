@@ -6,7 +6,6 @@ pub fn read_file(allocater: std.mem.Allocator, path: []const u8) ![]u8 {
 
     // Allocate heap memory for up to 1024 bytes of file contents
     var file_buffer = try allocater.alloc(u8, 1024);
-
     // Initialize memory to zero (safety: avoids garbage data)
     @memset(file_buffer[0..], 0);
 

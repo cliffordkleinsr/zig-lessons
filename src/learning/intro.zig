@@ -73,7 +73,7 @@ fn comptime_vs_runtime() !void {
 
     // --- Allocator setup ---
     var gpa: std.heap.GeneralPurposeAllocator(.{}) = .init;
-    // defer std.debug.assert(gpa.deinit() == .ok);
+    defer std.debug.assert(gpa.deinit() == .ok);
     const allocater = gpa.allocator();
 
     // --- Compile-time known slice ---
@@ -90,6 +90,10 @@ fn comptime_vs_runtime() !void {
     // --- Runtime known slice ---
     // Reads the entire file contents into heap-allocated memory.
     const file_contents = try read_file(allocater, path);
+    //rebuild the *original* allocation slice so that the `allocator.free()` sees the exact (ptr, len) it gave us.
+    // `file_contents.ptr` points to the beginning of the allocated block.
+    // `[0..1024]` restores the original allocation size.
+    defer allocater.free(file_contents.ptr[0..1024]);
 
     // Here we form a slice using runtime information:
     // file_contents.len is not known until the file is actually read.
@@ -281,7 +285,7 @@ fn useful_string_operations() !void {
     try stdout.flush(); //Dont forget to flush
 }
 pub fn main() !void {
-    switch (@as(i32, 0x4)) {
+    switch (@as(i32, 0xC)) {
         0x1 => try variables(),
         0x2 => try arrays_basics(),
         0x3 => try array_ops(),
