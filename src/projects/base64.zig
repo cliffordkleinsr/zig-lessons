@@ -180,6 +180,71 @@ const std = @import("std");
 /// The function `_calc_decode_length()` exposed below summarizes this logic that we described.
 /// It’s similar to the function `_calc_encode_length()`.
 /// Notice that this time, we apply a floor operation over the output of the division, by using the `divFloor()` function (instead of a ceiling operation with `divCeil()`).
+///
+/// ## Building the encoder logic
+/// In this section, we can start building the logic behind the `encode()` function, which will be responsible for encoding messages into the base64 encoding system.
+///
+/// ### The 6-bit transformation
+/// In essence, this 6-bit transformation is made with the help of bitwise operators.
+/// Bitwise operators are essential to any type of low-level operation that is done at the bit-level. For the specific case of the base64 algorithm,
+/// the operators bit shift to the left `(<<)`, bit shift to the right `(>>)`and the bitwise and `(&)` are used. They are the core solution for the 6-bit transformation.
+///
+/// There are 3 different scenarios that we need to take into account in this transformation.
+/// - First, is the perfect scenario, where we have the perfect window of 3 bytes to work on.
+/// - Second, we have the scenario where we have a window of only two bytes to work with.
+/// - And last, we have the scenario where we have a window of one single byte.
+///
+/// In each of these 3 scenarios, the 6-bit transformation works a bit differently.
+/// To put it simply, I will use the variable `output` to refer to the bytes in the output of the base64 encoder,
+/// and the variable `input` to refer to the bytes in the input of the encoder.
+///
+/// Taking into consideration the first scenario where you have the perfect window of 3 bytes, these are steps for the 6-bit transformation:
+/// 1. `output[0]` is produced by moving the bits from `input[0]` two positions to the right.
+/// 2. `output[1]` is produced by summing two components.
+///     First, take the last two bits from `input[0]`, then, move them four positions to the left.
+///     Second, move the bits from `input[1]` four positions to the right. Sum these two components.
+/// 3. `output[2]` is produced by summing two components.
+///     First, take the last four bits from `input[1]`, then, move them two positions to the left.
+///     Second, move the bits from `input[2]` six positions to the right. Sum these two components.
+/// 4. `output[3]` is produced by taking the last six bits from `input[2]`.
+///
+/// *See the example for "Sun".*
+///
+/// https://pedropark99.github.io/zig-book/Figures/base64-encoder-bit-shift.png
+///
+/// On the other hand, we must be prepared for the instances where we do not have the perfect window of 3 bytes.
+/// If you have a window of 2 bytes, then, the steps 3 and 4, which produces the bytes output[2] and output[3], change a little bit, and they become:
+/// 1. Same as above.
+/// 2. Same as above.
+/// 3. `output[2]` is produced by taking the last 4 bits from `input[1]`, then, move them two positions to the left.
+/// 4. `output[3]` is the character '`=`'.
+///
+/// *See the example for "Hi".*
+///
+/// Finally, if you have a window of a single byte, then, the steps 2 to 4, which produces the bytes output[1], output[2] and output[3] change, becoming:
+/// 1. Same as above in the perfect scenario.
+/// 2. `output[1]` is produced by taking the last two bits from input[0], then, move them four positions to the left.
+/// 3. Same as above in the perfect scenario.
+/// 4. `output[2]` and `output[3]` are the character `=`.
+///
+/// *See the example for "S".*
+///
+/// ### Bit-shifting in Zig
+/// Bit-shifting in Zig works similarly to bit-shifting in C.
+/// All bitwise operators that exist in C are available in Zig.
+/// Here, in the base64 encoder algorithm, they are essential to produce the result we want.
+///
+/// These operators operates at the bit-level of your values. This means that these operators takes the bits that form the value you have, and change them in some way.
+/// This ultimately also changes the value itself, because the binary representation of this value changes.
+/// We have already seen in this [Figure](https://pedropark99.github.io/zig-book/Figures/base64-encoder-flow.png) the effect produced by a bit-shift.
+///
+/// If you recall in the "Hi" example, the first byte present in the output should be equivalent to the 6-bit group 010010.
+/// Although being visually different, the sequences 010010 and 00010010 are semantically equal.
+/// They mean the same thing. They both represent the number 18 in decimal, and the value 0x12 in hexadecimal.
+///
+/// *See `first_shift_op()` example*
+/// ### Selecting specific bits with the & operator
+/// If you comeback to the, you will see that, in order to produce the second and third bytes in the output, we need to select specific bits from the first and second bytes in the input string. But how can we do that? The answer relies on the bitwise and (&) operator.
 const Base64 = struct {
     _table: *const [64]u8,
 
@@ -230,7 +295,23 @@ const Base64 = struct {
         return multi_groups;
     }
 };
+
+/// But let’s use the first byte in the output of the base64 encoder as another example of what bit-shifting means.
+///
+/// This is the easiest byte of the 4 bytes in the output to build.
+/// Because we only need to move the bits from the first byte in the input two positions to the right, with the bit shift to the right `(>>)` operator.
+/// If we take the string “Hi” as an example, the first byte in this string is “H”, which is the sequence `01001000` in binary.
+/// If we move the bits of this byte, two places to the right, we get the sequence `00010010` as result.
+/// This binary sequence is the value `18` in decimal, and also, the value `0x12` in hexadecimal.
+/// Notice that the 6-bit transformation **6 bits** of “H” were moved to the end of the byte. With this operation, we get the first byte of the output.
+fn first_shift_op() void {
+    const input = "Hi";
+
+    std.debug.print("{b:06}\n", .{input[0] >> 2});
+}
 pub fn main() !void {
     const base64 = Base64.init();
-    std.debug.print("{c}\n", .{base64._char_at(28)});
+    _ = base64;
+    // std.debug.print("{c}\n", .{base64._char_at(28)});
+    first_shift_op();
 }
