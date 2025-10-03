@@ -242,11 +242,59 @@ const std = @import("std");
 /// Although being visually different, the sequences 010010 and 00010010 are semantically equal.
 /// They mean the same thing. They both represent the number 18 in decimal, and the value 0x12 in hexadecimal.
 ///
-/// *See `first_shift_op()` example*
-/// ### Selecting specific bits with the & operator
-/// If you comeback to the, you will see that, in order to produce the second and third bytes in the output, we need to select specific bits from the first and second bytes in the input string. But how can we do that? The answer relies on the bitwise and (&) operator.
+/// *See `zig_bit_shifting()` example*
+///
+/// ### Selecting specific bits with the `&` operator
+/// If you comeback to the chapter *"The 6-bit transformation"*, you will see that, in order to produce the second and third bytes in the output,
+/// we need to select specific bits from the first and second bytes in the input string.
+/// But how can we do that? The answer relies on the bitwise and `(&)` operator.
+///
+/// This [Figure]( https://pedropark99.github.io/zig-book/Figures/base64-encoder-bit-shift.png) already showed you what effect this `&` operator produces
+/// in the bits of its operands.
+///
+/// In summary, the `&` operator performs a logical conjunction operation between the bits of its operands.
+/// In more details, the operator `&` compares each bit of the first operand to the corresponding bit of the second operand.
+/// If both bits are 1, the corresponding result bit is set to 1. Otherwise, the corresponding result bit is set to 0.
+/// [Microsoft](https://learn.microsoft.com/en-us/cpp/cpp/bitwise-and-operator-amp?view=msvc-170)
+///
+/// Both operands to the bitwise AND operator must have integral types.
+/// The usual arithmetic conversions covered in [Standard conversions](https://learn.microsoft.com/en-us/cpp/cpp/standard-conversions?view=msvc-170) are applied to the operands.
+///
+/// So, if we apply this operator to the binary sequences `1000100` and `00001101` the result of this operation is the binary sequence `00000100`.
+/// Because only at the sixth position in both binary sequences we had a 1 value.
+/// So any position where we do not have both binary sequences setted to `1`, we get a `0` bit in the resulting binary sequence.
+///
+/// We lose information about the original bit values from both sequences in this case.
+/// Because we no longer know if this `0` bit in the resulting binary sequence was produced by combining `0` with `0`, or `1` with `0`, or `0` with `1`.
+///
+/// ### Allocating space for the output
+/// As explained in the stack section of `chap_three.zig`, to store an object in the stack, this object needs to have a known and fixed length at compile-time.
+/// This is an important limitation for our base64 encoder/decoder"s case.
+/// Because the size of the output (from both the encoder and decoder) depends directly on the size of the input.
+///
+/// Having this in mind, we cannot know at compile time which is the size of the output for both the encoder and decoder.
+/// So, if we can’t know the size of the output at compile time, this means that we cannot store the output for both the encoder and decoder in the stack.
+///
+/// Consequently, we need to store this output on the heap, and, as outlined in the heap section of `chap_three.zig`,
+/// we can only store objects in the heap by using allocator objects. So, one of the arguments to both the `encode()` and `decode()` functions, needs to be an allocator object,
+/// because we know for sure that, at some point inside the body of these functions, we need to allocate space on the heap to store the output of these functions.
+///
+/// ### Writing the encode() function
+/// The `encode()` function has two arguments:
+/// 1. `input` is the input sequence of characters that you want to encode in `base64`.
+/// 2. `allocator` is an allocator object to use in the necessary memory allocations.
+///
+/// The main for loop in the function is responsible for iterating through the entire input string.
+/// In every iteration, we use a count variable to count how many iterations we had at the moment.
+/// When count reaches 3, then, we try to encode the 3 characters (or bytes) that we have accumulated in the temporary buffer object (buf).
+///
+/// After encoding these 3 characters and storing the result in the output variable,
+/// we reset the count variable to zero, and start to count again on the next iteration of the loop.
+///
+/// If the loop hits the end of the string, and, the count variable is less than 3, then, it means that the temporary buffer contains the last 1 or 2 bytes from the input.
+/// That is why we have two if statements after the for loop. To deal which each possible case.
 const Base64 = struct {
-    _table: *const [64]u8,
+    _table: *const [0x40]u8,
 
     fn init() Base64 {
         const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -256,10 +304,11 @@ const Base64 = struct {
         return Base64{ ._table = upper ++ lower ++ digits };
     }
 
+    /// Gets the base64 char at from table's index
     fn _char_at(self: Base64, index: usize) u8 {
         return self._table[index];
     }
-    // Base64 encodes data in chunks of 3 bytes → 4 chars.
+    /// Base64 encodes data in chunks of 3 bytes → 4 chars.
     fn _calc_encode_length(input: []const u8) !usize {
         // If input is less than 3 bytes, you still need 4 chars (with padding).
         if (input.len < 0x3) {
@@ -270,7 +319,7 @@ const Base64 = struct {
         // Final encoded length
         return n_groups * 4;
     }
-    // Base64 input is valid in groups of 4 characters.
+    /// Base64 input is valid in groups of 4 characters.
     fn _calc_decode_length(input: []const u8) !usize {
         // If fewer than 4 chars, it just assumes 3 bytes (smallest non-padded decode).
         if (input.len < 0x4) {
@@ -294,6 +343,74 @@ const Base64 = struct {
 
         return multi_groups;
     }
+
+    fn encode(self: Base64, allocator: std.mem.Allocator, input: []const u8) ![]u8 {
+        if (input.len == 0) {
+            return "";
+        }
+
+        const n_out = try _calc_encode_length(input);
+        var out = try allocator.alloc(u8, n_out);
+
+        var buf = [3]u8{ 0, 0, 0 };
+        var count: i32 = 0;
+        var iout: i32 = 0;
+
+        //lets take an example: kay
+        //buf[0] = 0b01001011   (K)
+        //buf[1] = 0b01100001   (a)
+        //buf[2] = 0b01111001   (y)
+
+        for (input, 0..) |_, i| {
+            buf[count] = input[i];
+            count += 1;
+
+            if (count == 3) {
+                // Group 1 (first 6 bits
+                // `buf[0] >> 2`
+                // buf[0] has 8 bits.
+                // Shifting right by 2 drops the last 2 bits, leaving the top 6.
+                // `0b01001011 >> 2` = `0b00010010`
+                //    →|→|               |↑↑ moves it further left by 2
+                // this gives the first 6-bit value.
+                out[iout] = self._char_at(buf[0] >> 2);
+                // Group 2 (crosses buf[0] and buf[1])
+                // buf[0] & 0X3 keeps the last 2 bits of buf[0].
+                // mask `0b01001011 & 0b00000011` → `0b00000011`.
+                // why three because it makes up two full bits in binary `0b00000011`
+                // `<< 4` moves those 2 bits into the top of a 6-bit group.
+                // `0b00000011 << 4` = `0b00110000`
+                //        ←|←              |↑↑ moves it to the start of the 6bit group
+                // buf[1] >> 4 takes the top 4 bits of buf[1].
+                // `0b01100001 >> 4` = 0b00000110`
+                //     →|→|→|→|           |↑↑↑↑ moves it further left by 4
+                // Adding them combines to form the next 6-bit chunk.
+                out[iout + 1] = self._char_at(((buf[0] & 3) << 4) + (buf[1] >> 4));
+                // Group 3 (crosses buf[1] and buf[2])
+                // buf[1] & 0xF keeps the last 4 bits (0xF = 00001111).
+                out[iout + 2] = self._char_at(((buf[1] & 0xF) << 2) + (buf[2] >> 6));
+                out[iout + 3] = self._char_at(buf[2] & 0x3f);
+                iout += 4;
+                count = 0;
+            }
+        }
+        if (count == 1) {
+            out[iout] = self._char_at(buf[0] >> 2);
+            out[iout + 1] = self._char_at((buf[0] & 0x03) << 4);
+            out[iout + 2] = '=';
+            out[iout + 3] = '=';
+        }
+
+        if (count == 2) {
+            out[iout] = self._char_at(buf[0] >> 2);
+            out[iout + 1] = self._char_at(((buf[0] & 0x03) << 4) + (buf[1] >> 4));
+            out[iout + 2] = self._char_at((buf[1] & 0x0f) << 2);
+            out[iout + 3] = '=';
+            iout += 4;
+        }
+        // out would be: 0b010010 0b110110 0b000101 0b111001
+        return out;
+    }
 };
 
 /// But let’s use the first byte in the output of the base64 encoder as another example of what bit-shifting means.
@@ -304,14 +421,40 @@ const Base64 = struct {
 /// If we move the bits of this byte, two places to the right, we get the sequence `00010010` as result.
 /// This binary sequence is the value `18` in decimal, and also, the value `0x12` in hexadecimal.
 /// Notice that the 6-bit transformation **6 bits** of “H” were moved to the end of the byte. With this operation, we get the first byte of the output.
-fn first_shift_op() void {
+fn zig_bit_shifting() void {
     const input = "Hi";
 
     std.debug.print("{b:06}\n", .{input[0] >> 2});
+}
+/// It takes two numbers, looks at their binary form (their bits), and compares them bit by bit:
+///
+/// - If both bits are **1**, the result for that position is **1**.
+/// - Otherwise (if one or both are **0**), the result is **0**.
+///
+/// As an example, suppose you have the binary sequence `10010111`, which is the number `151` in decimal.
+/// How can we get a new binary sequence which contains only the third and fourth bits of this sequence?
+///
+/// We just need to combine this sequence with `00110000` (is `0x30` in hexadecimal) using the `&` operator.
+/// Notice that only the third and fourth positions in this binary sequence is setted to `1`.
+///
+/// As a consequence, only the third and fourth values of both binary sequences are potentially preserved in the output.
+/// All the remaining positions are setted to zero in the output sequence, which is `00010000` (is the number 16 in decimal).
+fn zig_bitwise_and() void {
+    const a: u8 = 0b110; //6
+    const b: u8 = 0b011; //3
+
+    const val1: u8 = 0b10010111; // 151
+    const val2: u8 = 0b00110000; // 48
+
+    const mask = val1 & val2;
+    std.debug.print("{d}\n", .{a & b}); // 2
+
+    std.debug.print("{d}\n", .{mask});
 }
 pub fn main() !void {
     const base64 = Base64.init();
     _ = base64;
     // std.debug.print("{c}\n", .{base64._char_at(28)});
-    first_shift_op();
+    // zig_bit_shifting();
+    zig_bitwise_and();
 }

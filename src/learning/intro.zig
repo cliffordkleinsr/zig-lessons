@@ -212,7 +212,7 @@ fn unicode_chars_basics() !void {
     // That is why, the unicode point 570 is actually stored inside the computer’s memory as the bytes C8 BA.
     try stdout.print("Hex upper value of char:  ", .{});
     for (char) |byte| {
-        try stdout.print("{X} ", .{byte});
+        try stdout.print("0x{X} ", .{byte});
     }
     try stdout.flush(); // Dont forget to flush
     // if your UTF-8 string contains only english letters (or ASCII letters),
@@ -285,7 +285,7 @@ fn useful_string_operations() !void {
     try stdout.flush(); //Dont forget to flush
 }
 pub fn main() !void {
-    switch (@as(i32, 0x3)) {
+    switch (@as(i32, 0xB)) {
         0x1 => try variables(),
         0x2 => try arrays_basics(),
         0x3 => try array_ops(),
