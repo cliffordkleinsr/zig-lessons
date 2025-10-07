@@ -371,27 +371,68 @@ const Base64 = struct {
                 // buf[0] has 8 bits.
                 // Shifting right by 2 drops the last 2 bits, leaving the top 6.
                 // `0b01001011 >> 2` = `0b00010010`
-                //    →|→|               |↑↑ moves it further left by 2
+                //     →↑                 |↑↑ moves it further left by 2
                 // this gives the first 6-bit value.
+                //____________
+                //Group1: 0b00010010
                 out[iout] = self._char_at(buf[0] >> 2);
                 // Group 2 (crosses buf[0] and buf[1])
-                // buf[0] & 0X3 keeps the last 2 bits of buf[0].
+                // buf[0] & 3 keeps the last 2 bits of buf[0].
                 // mask `0b01001011 & 0b00000011` → `0b00000011`.
-                // why three because it makes up two full bits in binary `0b00000011`
+                //  0b01001011
+                //& 0b00000011
+                //____________
+                //= 0b00000011
+                // why 0x3? because `0x3 = 00000011` → keep 2 bits (for when we only want buf[0]’s 2 lowest bits).
                 // `<< 4` moves those 2 bits into the top of a 6-bit group.
                 // `0b00000011 << 4` = `0b00110000`
-                //        ←|←              |↑↑ moves it to the start of the 6bit group
+                //     |↑↑|←|←             |↑↑ moves it to the start of the 6bit group
                 // buf[1] >> 4 takes the top 4 bits of buf[1].
-                // `0b01100001 >> 4` = 0b00000110`
-                //     →|→|→|→|           |↑↑↑↑ moves it further left by 4
+                // `0b01100001 >> 4` = `0b00000110`
+                //     →|→|↑↑|             |↑↑↑↑ moves it further left by 4
                 // Adding them combines to form the next 6-bit chunk.
-                out[iout + 1] = self._char_at(((buf[0] & 3) << 4) + (buf[1] >> 4));
+                //        0b00110000
+                //      + 0b00000110
+                //       ____________
+                //Group2: 0b00110110
+                out[iout + 1] = self._char_at(((buf[0] & 0x3) << 4) + (buf[1] >> 4));
                 // Group 3 (crosses buf[1] and buf[2])
-                // buf[1] & 0xF keeps the last 4 bits (0xF = 00001111).
+                // buf[1] & 15 keeps the last 4 bits (15 = 0b00001111).
+                // mask `0b01100001 & 0b00001111` → `0b00000001`.
+                //  0b01100001
+                //& 0b00001111
+                //____________
+                //= 0b00000001
+                // why 0xF? because `0xF = 00001111` → keep 4 bits.
+                // `<< 2` shifts them into the top of a 6-bit group.
+                // `0b00000001 << 2` = `0b00000100`
+                //         ↑|←                 |↑ moves it to the start of the 6bit group
+                // buf[2] >> 6 keeps the top 2 bits of buf[2].
+                // `0b01111001 >> 6` = 0b00000001
+                //     →|→|↑↑|                 |↑
+                // Together that’s 4 bits from buf[1] + 2 bits from buf[2].
+                //        0b00000100
+                //      + 0b00000001
+                //       ____________
+                //Group3: 0b00000101
                 out[iout + 2] = self._char_at(((buf[1] & 0xF) << 2) + (buf[2] >> 6));
-                out[iout + 3] = self._char_at(buf[2] & 0x3f);
+                // Group 4 (last 6 bits of buf[2])
+                // 0x3f = binary 0b00111111 = 63.
+                // `buf[2] & 0x3F` keeps the last 6 bits of buf[2].
+                // mask `0b01111001 & 0b00111111` → `0b00111001`.
+                //  0b01111001
+                //& 0b00111111
+                //____________
+                //= 0b00111001
+                // Why 0x3F? because `0x3F = 00111111` → keep 6 bits (max base64 chunk).
+                // This keeps the last 6 bits of buf[2].
+                //____________
+                // Group4: 0b00111001
+                out[iout + 3] = self._char_at(buf[2] & 0x3F);
                 iout += 4;
                 count = 0;
+
+                // results = 0b00010010 0b00110110 0b00000101 0b00111001
             }
         }
         if (count == 1) {
@@ -447,6 +488,7 @@ fn zig_bitwise_and() void {
     const val2: u8 = 0b00110000; // 48
 
     const mask = val1 & val2;
+
     std.debug.print("{d}\n", .{a & b}); // 2
 
     std.debug.print("{d}\n", .{mask});
