@@ -293,6 +293,74 @@ const std = @import("std");
 ///
 /// If the loop hits the end of the string, and, the count variable is less than 3, then, it means that the temporary buffer contains the last 1 or 2 bytes from the input.
 /// That is why we have two if statements after the for loop. To deal which each possible case.
+///
+/// ## Building the decoder logic
+/// The decoder `decode()` function performs the inverse process of the `encode()` function.
+///
+/// ### Mapping base64 characters to their indexes
+/// One thing that we need to do, in order to decode a base64-encoded message,
+/// is to calculate the index in the base64 scale of every base64 character that we encounter in the decoder input.
+///
+/// In other words, the decoder receives as input a sequence of characters from the Base64 alphabet.
+/// Each character is mapped to its corresponding 6-bit index value (0–63).
+/// Once we have this sequence of 6-bit values, we concatenate their bits and regroup them into 8-bit bytes to reconstruct the original binary data.
+/// In practice, this mapping can be optimized by using a lookup table, allowing constant-time translation instead of performing character searches for each symbol.
+///
+/// The `_char_index()` function below contains this strategy.
+/// We are essentially looping through the lookup table with the base64 scale, and comparing the character we got with each character in the base64 scale.
+/// If these characters match, then, we return the index of this character in the base64 scale as the result.
+///
+/// if the input character is '=', the function returns the index 64, which is “out of range” in the scale.
+/// But, as described in the "Base64 Scale Chapter", the character '=' does not belong to the base64 scale itself.
+/// It’s a special and meaningless character in base64.
+///
+/// ### The 6-bit transformation
+/// This is the core of the Base64 decoding algorithm.
+/// Once you understand how this 6-bit transformation works, the rest of the decoder becomes straightforward.
+///
+/// Before performing the transformation, the input Base64 characters must first be converted
+/// into their corresponding numeric indexes using `_char_index()`.
+/// The result of this conversion is stored in a temporary buffer of 6-bit values.
+/// These indexes (not the original characters) are then used to reconstruct the original bytes.
+///
+/// In the encoding process, every group of 3 bytes is transformed into 4 Base64 characters.
+/// The decoding process is the inverse — it takes 4 Base64 characters and reconstructs the 3 original bytes.
+///
+/// The steps for reconstructing each output byte are as follows:
+///
+/// 1. **output[0]**
+///    - Take the first 6 bits from `buf[0]` and shift them left by 2 positions.
+///    - Take the top 2 bits from `buf[1]` (by shifting it right by 4).
+///    - Add these two components together to form the first byte.
+///
+/// 2. **output[1]**
+///    - Take the remaining 4 bits from `buf[1]` and shift them left by 4 positions.
+///    - Take the top 4 bits from `buf[2]` (by shifting it right by 2).
+///    - Add these components together to form the second byte.
+///
+/// 3. **output[2]**
+///    - Take the remaining 2 bits from `buf[2]` and shift them left by 6 positions.
+///    - Add all 6 bits from `buf[3]` to complete the third byte.
+///
+/// This process reverses the Base64 encoding step, merging the 6-bit groups back into
+/// their original sequence of 8-bit bytes.
+///
+/// ### Writing the `decode()` function
+/// The `decode()` function below contains the entire decoding process.
+/// We first calculate the size of the output, with `_calc_decode_length()`, then, we allocate enough memory for this output with the allocator object.
+///
+/// Three temporary variables are created:
+/// 1. `count`, to hold the window count in each iteration of the for loop.
+/// 2. `iout`, to hold the current index in the output.
+/// 3. `buf`, which is the temporary buffer that holds the base64 indexes to be converted through the 6-bit transformation.
+///
+/// Then, in each iteration of the for loop we fill the temporary buffer with the current window of bytes.
+/// When `count` hits the number 4, then, we have a full window of indexes in `buf` to be converted, and then, we apply the 6-bit transformation over the temporary buffer.
+///
+/// Notice that we check if the indexes 2 and 3 in the temporary buffer are the number 64, which,
+/// if you recall from section mapping base64 characters to their indexes, is when the `_calc_index()` function receives a '=' character as input.
+///
+/// So, if these indexes are equal to the number `64`, the `decode()` function knows that it can simply ignore these indexes.
 const Base64 = struct {
     _table: *const [0x40]u8,
 
@@ -308,7 +376,32 @@ const Base64 = struct {
     fn _char_at(self: Base64, index: usize) u8 {
         return self._table[index];
     }
+    /// Gets the index from the base64 char in the table
+    fn _char_at_index(self: Base64, char: u8) u8 {
+        if (char == '=') {
+            return 0x40;
+        }
+
+        var index: u8 = 0;
+        for (self._table, 0..) |_, i| {
+            if (self._char_at(i) == char) {
+                break;
+            }
+            index += 1;
+        }
+
+        return index;
+    }
     /// Base64 encodes data in chunks of 3 bytes → 4 chars.
+    ///
+    /// *Examples*:
+    /// ```zig
+    /// "A".len = 1 → ceil(1 / 3) = 1 → 1 × 4 = 4
+    /// "AB".len = 2 → ceil(2 / 3) = 1 → 1 × 4 = 4
+    /// "ABC".len = 3 → ceil(3 / 3) = 1 → 1 × 4 = 4
+    /// "ABCD".len = 4 → ceil(4 / 3) = 2 → 2 x 4 = 8
+    /// "ABCDEFG".len = 7 → ceil(7 / 3) = 3 → 3 x 4 = 12
+    /// ```
     fn _calc_encode_length(input: []const u8) !usize {
         // If input is less than 3 bytes, you still need 4 chars (with padding).
         if (input.len < 0x3) {
@@ -320,6 +413,27 @@ const Base64 = struct {
         return n_groups * 4;
     }
     /// Base64 input is valid in groups of 4 characters.
+    ///
+    /// *Example `TWFu`*:
+    /// ```zig
+    /// "TWFu".len = 4 → divFloor(4, 4) = 1 → 1 × 4 = 4 → multi_groups = 4
+    /// "TWFu".len - 1 = 3
+    /// input[3] is 'u' breaks and returns 4
+    ///```
+    /// *Example `TWE=`*:
+    /// ```zig
+    /// "TWE=".len = 4 → divFloor(4, 4) = 1 → 1 × 4 = 4 → multi_groups = 4
+    /// "TWE=".len - 1 = 3
+    /// input[3] == '=' → multi_groups -= 1 → 3
+    /// input[2] == 'E' breaks and returns 3
+    /// ```
+    /// *Example: `TQ==`*
+    /// ```zig
+    /// "TQ==".len = 4 → divFloor(4, 4) = 1 → 1 × 4 = 4 → multi_groups = 4
+    /// "TQ==".len - 1 = 3
+    /// input[3] == '=' → multi_groups -= 1 → 3
+    /// input[2] == '=' → multi_groups -= 1 → 2
+    /// input[1] == 'E' breaks and returns 2
     fn _calc_decode_length(input: []const u8) !usize {
         // If fewer than 4 chars, it just assumes 3 bytes (smallest non-padded decode).
         if (input.len < 0x4) {
@@ -345,44 +459,47 @@ const Base64 = struct {
     }
 
     fn encode(self: Base64, allocator: std.mem.Allocator, input: []const u8) ![]u8 {
+        // If input is empty, return empty string.
         if (input.len == 0) {
             return "";
         }
-
+        // Calculates how long the encoded output should be based on the input.
         const n_out = try _calc_encode_length(input);
+        // allocates a buffer big enough to hold it.
         var out = try allocator.alloc(u8, n_out);
-
+        // buf is a small buffer of up to 3 bytes (what we’ll encode).
         var buf = [3]u8{ 0, 0, 0 };
-        var count: i32 = 0;
-        var iout: i32 = 0;
+        // count tracks how many bytes are in `buf`.
+        var count: u8 = 0;
+        // iout is the current index in the output.
+        var iout: usize = 0;
 
-        //lets take an example: kay
-        //buf[0] = 0b01001011   (K)
-        //buf[1] = 0b01100001   (a)
-        //buf[2] = 0b01111001   (y)
-
-        for (input, 0..) |_, i| {
-            buf[count] = input[i];
+        // for (input, 0..) |_, i| {
+        for (input) |ch| {
+            buf[count] = ch; //input[i];
             count += 1;
-
+            //lets take an example: kay
+            //buf[0] = 0b01001011   (K)
+            //buf[1] = 0b01100001   (a)
+            //buf[2] = 0b01111001   (y)
             if (count == 3) {
                 // Group 1 (first 6 bits
                 // `buf[0] >> 2`
                 // buf[0] has 8 bits.
                 // Shifting right by 2 drops the last 2 bits, leaving the top 6.
                 // `0b01001011 >> 2` = `0b00010010`
-                //     →↑                 |↑↑ moves it further left by 2
+                //      →↑                 |↑↑ moves it further left by 2
                 // this gives the first 6-bit value.
-                //____________
-                //Group1: 0b00010010
+                // ____________
+                // Group1: 0b00010010
                 out[iout] = self._char_at(buf[0] >> 2);
                 // Group 2 (crosses buf[0] and buf[1])
                 // buf[0] & 3 keeps the last 2 bits of buf[0].
                 // mask `0b01001011 & 0b00000011` → `0b00000011`.
-                //  0b01001011
-                //& 0b00000011
-                //____________
-                //= 0b00000011
+                //   0b01001011
+                // & 0b00000011
+                // ____________
+                // = 0b00000011
                 // why 0x3? because `0x3 = 00000011` → keep 2 bits (for when we only want buf[0]’s 2 lowest bits).
                 // `<< 4` moves those 2 bits into the top of a 6-bit group.
                 // `0b00000011 << 4` = `0b00110000`
@@ -391,18 +508,18 @@ const Base64 = struct {
                 // `0b01100001 >> 4` = `0b00000110`
                 //     →|→|↑↑|             |↑↑↑↑ moves it further left by 4
                 // Adding them combines to form the next 6-bit chunk.
-                //        0b00110000
-                //      + 0b00000110
+                //         0b00110000
+                //       + 0b00000110
                 //       ____________
-                //Group2: 0b00110110
+                // Group2: 0b00110110
                 out[iout + 1] = self._char_at(((buf[0] & 0x3) << 4) + (buf[1] >> 4));
                 // Group 3 (crosses buf[1] and buf[2])
                 // buf[1] & 15 keeps the last 4 bits (15 = 0b00001111).
                 // mask `0b01100001 & 0b00001111` → `0b00000001`.
-                //  0b01100001
-                //& 0b00001111
-                //____________
-                //= 0b00000001
+                //   0b01100001
+                // & 0b00001111
+                // ____________
+                // = 0b00000001
                 // why 0xF? because `0xF = 00001111` → keep 4 bits.
                 // `<< 2` shifts them into the top of a 6-bit group.
                 // `0b00000001 << 2` = `0b00000100`
@@ -411,22 +528,22 @@ const Base64 = struct {
                 // `0b01111001 >> 6` = 0b00000001
                 //     →|→|↑↑|                 |↑
                 // Together that’s 4 bits from buf[1] + 2 bits from buf[2].
-                //        0b00000100
-                //      + 0b00000001
-                //       ____________
-                //Group3: 0b00000101
+                //         0b00000100
+                //       + 0b00000001
+                //        ____________
+                // Group3: 0b00000101
                 out[iout + 2] = self._char_at(((buf[1] & 0xF) << 2) + (buf[2] >> 6));
                 // Group 4 (last 6 bits of buf[2])
                 // 0x3f = binary 0b00111111 = 63.
                 // `buf[2] & 0x3F` keeps the last 6 bits of buf[2].
                 // mask `0b01111001 & 0b00111111` → `0b00111001`.
                 //  0b01111001
-                //& 0b00111111
-                //____________
-                //= 0b00111001
+                // & 0b00111111
+                // ____________
+                // = 0b00111001
                 // Why 0x3F? because `0x3F = 00111111` → keep 6 bits (max base64 chunk).
                 // This keeps the last 6 bits of buf[2].
-                //____________
+                // ____________
                 // Group4: 0b00111001
                 out[iout + 3] = self._char_at(buf[2] & 0x3F);
                 iout += 4;
@@ -435,22 +552,174 @@ const Base64 = struct {
                 // results = 0b00010010 0b00110110 0b00000101 0b00111001
             }
         }
+        // Lets take an example of S
+        // buf[0] = 0b01010011  (S)
         if (count == 1) {
+            // Group 1 (first 6 bits)
+            // `buf[0] >> 2`
+            // buf[0] has 8 bits.
+            // Shifting right by 2 drops the last 2 bits, leaving the top 6.
+            // `0b01010011 >> 2 = 0b00010100`
+            //      →↑                |↑↑ moves it further left by 2
+            // this gives the first 6-bit value.
+            // ____________
+            // Group1: 0b00010100
             out[iout] = self._char_at(buf[0] >> 2);
-            out[iout + 1] = self._char_at((buf[0] & 0x03) << 4);
+            // Group 2 (masks the last 2 bits of buf[0] and moves the bits to the start of the 6bit group)
+            // buf[0] & 0x3 keeps the last 2 bits of buf[0].
+            // mask `0b01010011 & 0b00000011` → `0b00000011`.
+            //   0b01010011
+            // & 0b00000011
+            // ____________
+            // = 0b00000011
+            // `<< 4 moves those 2 bits into the top of a 6-bit group.`
+            // `0b00000011 << 4` = `0b00110000`
+            //     |↑↑|←|←             |↑↑ moves it to the start of the 6bit group
+            // This mask forms the next 6-bit chunk.
+            // ____________
+            // Group2: 0b00110000
+            out[iout + 1] = self._char_at((buf[0] & 0x3) << 4);
+            // Group3: (padds the next 6bit group since we have no bits to encode)
+            // ____________
+            // Group3: =
             out[iout + 2] = '=';
+            // Group4: (padds the last 6bit group since we have no bits to encode)
+            // ____________
+            // Group4: =
             out[iout + 3] = '=';
+
+            // results = 0b00010100 0b00110000 = =
         }
 
+        // Lets take an example of Su
+        // buf[0] = 0b01010011  (S)
+        // buf[1] = 0b01110101  (u)
         if (count == 2) {
+            // Group 1 (first 6 bits)
+            // Shifting right by 2 drops the last 2 bits, leaving the top 6.
+            // `0b01010011 >> 2 = 0b00010100`
+            //      →↑                |↑↑ moves it further left by 2
+            // this gives the first 6-bit value.
+            // ____________
+            // Group1: 0b00010100
             out[iout] = self._char_at(buf[0] >> 2);
-            out[iout + 1] = self._char_at(((buf[0] & 0x03) << 4) + (buf[1] >> 4));
-            out[iout + 2] = self._char_at((buf[1] & 0x0f) << 2);
+            // Group 2 (crosses buf[0] and buf[1])
+            // buf[0] & 0x3 keeps the last 2 bits of buf[0].
+            // mask `0b01010011 & 0b00000011` → `0b00000011`.
+            //   0b01010011
+            // & 0b00000011
+            // ____________
+            // = 0b00000011
+            // `<< 4 moves those 2 bits into the top of a 6-bit group.`
+            // `0b00000011 << 4` = `0b00110000`
+            //     |↑↑|←|←             |↑↑ moves it to the start of the 6bit group
+            //
+            // `buf[1] >> 4` takes the top 4 bits of buf[1].
+            // `0b01110101 >> 4 = 0b00000111`
+            //     →|→|↑↑|             |↑↑↑↑ moves it further left by 4
+            // Adding them combines to form the next 6-bit chunk.
+            //         0b00110000
+            //       + 0b00000111
+            //       ____________
+            // Group2: 0b00110111
+            out[iout + 1] = self._char_at(((buf[0] & 0x3) << 4) + (buf[1] >> 4));
+            // Group 3 (masks the last 4 bits of buf[1] and moves the bits to the start of the 6bit group)
+            // mask `0b01110101 & 0b00001111` → `0b00000101`.
+            //   0b01110101
+            // & 0b00001111
+            // ____________
+            // = 0b00000101
+            // `<< 2` shifts them into the top of a 6-bit group.
+            // `0b00000101 << 2 = 0b00010100`
+            //        |↑|←            |↑↑↑ moves it further right by 2
+            // This gives the next 6-bit value.
+            // ____________
+            // Group3: 0b00010100
+            out[iout + 2] = self._char_at((buf[1] & 0xF) << 2);
+            // Group4: (padds the last 6bit group since we have no bits to encode)
+            // ____________
+            // Group4: =
             out[iout + 3] = '=';
             iout += 4;
+
+            // results = 0b00010100 0b00110111 0b00010100 =
         }
-        // out would be: 0b010010 0b110110 0b000101 0b111001
+
         return out;
+    }
+
+    fn decode(self: Base64, allocator: std.mem.Allocator, input: []const u8) ![]u8 {
+        if (input.len == 0) {
+            return "";
+        }
+        // computes how many bytes the decoded output will have accounting for any '=' padding at the end
+        const n_out = try _calc_decode_length(input);
+        // allocates a buffer big enough to hold it.
+        var output = try allocator.alloc(u8, n_out);
+
+        var count: u8 = 0;
+        var iout: usize = 0;
+        // We read 4 Base64 characters at a time into this buffer
+        var buf = [4]u8{ 0, 0, 0, 0 };
+
+        for (input) |ch| {
+            buf[count] = self._char_at_index(ch);
+            count += 1;
+
+            // lets take an example of the b64 chars = U3Vu
+            // buf = [20, 55, 21, 46]
+            if (count == 4) {
+                // buf[0] = 20
+                // 0b00010100 << 2 = 0b01010000
+                //       |↑|←            |↑ Shift left 2 to move into top of an 8-bit group
+                // buf[1] = 55
+                // 0b00110111 >> 4 = 0b00000011
+                //     →|→|↑|            |↑↑↑↑ Take top 2 bits
+                // Adding them combines to form the first 8-bit chunk.
+                //         0b01010000
+                //       + 0b00000011
+                //       ____________
+                // Char1:  0b01010011
+                output[iout] = (buf[0] << 2) + (buf[1] >> 4);
+                // buf[2] = 21 = 0b00010101
+                if (buf[2] != 64) {
+                    // buf[1] = 55
+                    // 0b00110111 << 4 = 0b0011_0111_0000
+                    //      ↑|←|←                 |↑ Shift left 4 to move into top of an 8-bit group
+                    // this will result in an integer with 12 bit precision we therefore the cpu will only take the fixed width, typically 8 bits Specified in the buffer.
+                    // buf[2] = 21
+                    // 0b00010101 >> 2 = 0b00000101
+                    //    →|↑|            |↑↑↑↑ Take top 2 bits
+                    // Adding them combines to form the next 8-bit chunk.
+                    // We need to add only the 8-bit overlapping region
+                    // 0b0011_0111_0000 → 0b01110000
+                    //         0b01110000
+                    //       + 0b00000101
+                    //       ____________
+                    // Char2:  0b01110101
+                    output[iout + 1] = (buf[1] << 4) + (buf[2] >> 2);
+                }
+                // buf[3] = 46
+                if (buf[3] != 64) {
+                    // buf[2] = 21
+                    // 0b00010101 << 6 = 0b0000_0101_0100_0000
+                    // this will result in an integer with 16 bit precision we therefore the cpu will only take the fixed width, typically 8 bits Specified in the buffer.
+                    // Adding them combines to form the last 8-bit chunk.
+                    // We need to add only the 8-bit overlapping region
+                    // 0b0000_0101_0100_0000 → 0b01000000
+                    //         0b01000000
+                    //       + 0b00101110
+                    //       ____________
+                    // Char3:  0b01101110
+                    output[iout + 2] = (buf[2] << 6) + buf[3];
+                }
+
+                iout += 3;
+                count = 0;
+                // results = 0b01010011 0b01110101 0b01101110 = S u n
+            }
+        }
+        return output;
     }
 };
 
@@ -492,11 +761,39 @@ fn zig_bitwise_and() void {
     std.debug.print("{d}\n", .{a & b}); // 2
 
     std.debug.print("{d}\n", .{mask});
+
+    // std.debug.print("{d}\n", .{std.math.maxInt(u4)});
 }
 pub fn main() !void {
+    // buffers
+    var stdout_buffer: [0x400]u8 = undefined;
+
+    // writer interface
+    var std_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &std_writer.interface;
+
+    // Heap allocation
+    var memory_buffer: [0x400]u8 = undefined;
+    var fba = std.heap.FixedBufferAllocator.init(&memory_buffer);
+
+    const allocator = fba.allocator();
+
+    // encoding | decoding
+    const text = "Sun";
+    const enctext = "U3Vu";
+
+    const b64 = Base64.init();
+
+    const encoded_text = try b64.encode(allocator, text);
+    const decoded_text = try b64.decode(allocator, enctext);
+
+    try stdout.print("Encoded Text: {s}\n", .{encoded_text});
+    try stdout.print("Decoded Text: {s}\n", .{decoded_text});
+
+    try stdout.flush();
+}
+
+test "get char" {
     const base64 = Base64.init();
-    _ = base64;
-    // std.debug.print("{c}\n", .{base64._char_at(28)});
-    // zig_bit_shifting();
-    zig_bitwise_and();
+    try std.testing.expectEqual(base64._char_at(28), 'c');
 }

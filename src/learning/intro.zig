@@ -285,7 +285,7 @@ fn useful_string_operations() !void {
     try stdout.flush(); //Dont forget to flush
 }
 pub fn main() !void {
-    switch (@as(i32, 0xB)) {
+    switch (@as(u8, 0xB)) {
         0x1 => try variables(),
         0x2 => try arrays_basics(),
         0x3 => try array_ops(),

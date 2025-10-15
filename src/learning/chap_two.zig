@@ -363,7 +363,7 @@ fn zig_modules() !void {
     try pool.spawn(work, .{7});
 }
 pub fn main() !void {
-    switch (@as(i32, 0xD)) {
+    switch (@as(u8, 0xD)) {
         0x1 => try ctrl_flow_basics(),
         0x2 => try switch_statements(),
         0x3 => try labaled_switch_statements(),

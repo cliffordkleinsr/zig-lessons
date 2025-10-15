@@ -391,7 +391,7 @@ fn single_allocator_operations() !void {
     std.debug.print("New user with name {s} created!\n", .{user.*.name});
 }
 pub fn main() !void {
-    switch (@as(i32, 0xA)) {
+    switch (@as(u8, 0xA)) {
         0x1 => try comptime_known(),
         0x2 => try stack_memory(),
         0x3 => try stack_overflow(),
