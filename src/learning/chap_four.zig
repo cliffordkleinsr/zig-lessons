@@ -21,9 +21,77 @@ const std = @import("std");
 /// For our purpose here, which is to write something to the stdout, especially to debug our program,
 /// we use the `writer()` method, which gives you a writer object.
 /// This writer object offers some helper methods to write stuff into the file descriptor object that represents the stdout stream specifically the `print()` method.
+///
+/// The `print()` method from this writer object is a “print formatter” type of a function.
+/// In other words, this method works exactly like the `printf()` function from C, or, like `println!()` from Rust.
+/// In the first argument of the function, you specify a template string, and, in the second argument,
+/// you provide a list of values (or objects) that you want to insert into your template message.
+///
+/// Ideally, the template string in the first argument should contain some format specifier.
+/// Each format specifier is matched to a value (or object) that you have listed in the second argument.
+/// So, if you provided 5 different objects in the second argument, then, the template string should contain 5 format specifiers, one for each object provided.
+///
+/// Each format specifier is represented by a single letter, and you provide this format specifier inside a pair of curly braces.
+/// So, if you want to format your object using the string specifier (s), then, you can insert the text {s} in your template string.
+/// Here is a quick list of the most used format specifiers:
+///
+/// - `d`: for printing integers and floating-point numbers.
+/// - `c`: for printing characters.
+/// - `s`: for printing strings.
+/// - `p`: for printing memory addresses.
+/// - `x` & `X`: for printing hexadecimal values.
+/// - `any`: use any compatible format specifier (i.e., it automatically selects a format specifier for you).
+///
+/// ## 4.2 Debugging through debuggers
+/// Although print debugging is a valid and very useful strategy, most programmers prefer to use a debugger to debug their programs.
+/// Since Zig is a low-level language, you can use either GDB (GNU Debugger), or LLDB (LLVM Project Debugger) as your debugger.
+///
+/// Both debuggers can work with Zig code, and it’s a matter of taste here. You choose the debugger of your preference, and you work with it.
+/// In this book, I will use LLDB as my debugger in the examples.
+///
+/// ### 4.2.1 Compile your source code in debug mode (Linux & Mac Only)
+/// In order to debug your program through a debugger, you must compile your source code in Debug mode.
+/// Because when you compile your source code in other modes (such as Release),
+/// the compiler usually strips out some essential information that is used by the debugger to read and track your program, like PDB (Program Database) files.
+///
+/// By compiling your source code in **Debug mode**, you ensure that the debugger will find the necessary information in your program to debug it.
+/// By default, the compiler uses the **Debug mode** when compiling your code.
+///
+/// Having this in mind, when you compile your program with the build-exe command (which was described in Section 1.2.4),
+/// if you don’t specify an explicit mode through the `-O` command-line 2 argument, then, the compiler will compile your code in **Debug mode**.
 pub fn main() !void {
-    switch (@as(u8, 0x1)) {
-        0x1 => 0,
+    switch (@as(u8, 0x2)) {
+        0x1 => try printer(),
+        0x2 => try debug_printer(),
         else => unreachable,
     }
+}
+
+fn add(x: u16, y: u16) u16 {
+    return x + y;
+}
+
+fn printer() !void {
+    // stdout
+    var stdout_buffer: [0x30]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    try stdout.print("109 + 333 = {d}\n", .{add(109, 250)});
+    try stdout.flush();
+}
+
+fn add_n_increment(x: u16, y: u16) u16 {
+    var z = x + y;
+    z += 1;
+    return z;
+}
+
+fn debug_printer() !void {
+    var stdout_buffer: [0x30]u8 = undefined;
+    var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
+    const stdout = &stdout_writer.interface;
+
+    try stdout.print("Ther result of adding and incrementing 10 and 30 by one is: {d}\n", .{add_n_increment(10, 30)});
+    try stdout.flush();
 }
