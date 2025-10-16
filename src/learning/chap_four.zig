@@ -57,8 +57,34 @@ const std = @import("std");
 /// By compiling your source code in **Debug mode**, you ensure that the debugger will find the necessary information in your program to debug it.
 /// By default, the compiler uses the **Debug mode** when compiling your code.
 ///
+/// run
+/// ```sh
+///     zig build-exe ./src/learning/chap_four.zig`
+/// ```
+///  when `0x2` is set on the switch
+///
+/// Now, we can start LLDB with add_program, like this:
+/// ```sh
+///     lldb add_program
+/// ```
+///
 /// Having this in mind, when you compile your program with the build-exe command (which was described in Section 1.2.4),
 /// if you don’t specify an explicit mode through the `-O` command-line 2 argument, then, the compiler will compile your code in **Debug mode**.
+///
+/// From now on, LLDB is started, and you can know that I’m executing LLDB commands by looking at the prefix `(lldb)`.
+/// If something is prefixed with `(lldb)`, then you know that it’s a LLDB command.
+///
+/// The first thing I will do, is to set a breakpoint at the `main()` function, by executing `b chap_four.main`.
+/// the debugger must be prefixed wwith the parent filename unless its the `main.zig` file.q
+/// After that, I just start the execution of the program with `run`.
+/// You can see in the output below, that the execution stopped at the first line in the function `main()`, as we expected.
+///
+/// Currently, we are in the first line at the `main()` function.
+/// In this line, we create the n object, by executing the `add_and_increment()` function.
+/// To execute the current line of code, and go to the next line, we can run the `n` LLDB command.
+///
+/// After we execute this line, we can also look at the value stored inside this n object by using the p LLDB command.
+/// The syntax for this command is `p <name-of-object>`.
 pub fn main() !void {
     switch (@as(u8, 0x2)) {
         0x1 => try printer(),
