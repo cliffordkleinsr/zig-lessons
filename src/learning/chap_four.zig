@@ -59,7 +59,7 @@ const std = @import("std");
 ///
 /// run
 /// ```sh
-///     zig build-exe ./src/learning/chap_four.zig`
+///     zig build-exe ./src/learning/programs/add_program.zig
 /// ```
 ///  when `0x2` is set on the switch
 ///
@@ -85,10 +85,33 @@ const std = @import("std");
 ///
 /// After we execute this line, we can also look at the value stored inside this n object by using the p LLDB command.
 /// The syntax for this command is `p <name-of-object>`.
+///
+/// If we take a look at the value stored in the n object (p n), notice that it stores the hexadecimal value 0x06, which is the number 6 in decimal.
+/// We can also see that this value has a type of unsigned char, which is an unsigned 8-bit integer.
+/// We have talked already about this in Section 1.8, that u8 integers in Zig are equivalent to the C data type unsigned char.
+///
+/// Now, on the next line of code, we are executing the add_and_increment() function once again.
+/// Why not step inside this function? Shall we? We can do that, by executing the s LLDB command.
+/// Notice in the example below that, after executing this command, we have entered into the context of the `add_and_increment()` function.
+///
+/// Also notice in the example below that, I have walked two more lines in the function’s body, then,
+/// I execute the `frame variable` LLDB command, to see at once, the value stored in each of the variables that were created inside the current scope.
+///
+/// ## 4.3 How to investigate the data type of your objects
+/// Since Zig is a strongly-typed language, the data types associated with your objects are very important for your program.
+/// So, debugging the data types associated with your objects might be important to understand bugs and errors in your program.
+///
+/// When you walk through your program with a debugger, you can inspect the types of your objects by simply printing them to the console, with the LLDB p command.
+/// But you also have alternatives embedded in the language itself to access the data types of your objects.
+///
+/// In Zig, you can retrieve the data type of an object, by using the built-in function @TypeOf().
+/// Just apply this function over the object, and you get access to the data type of the object.
+///
+/// This function is similar to the `type()` built-in function from Python, or, the `typeof` operator in Javascript.
 pub fn main() !void {
     switch (@as(u8, 0x2)) {
         0x1 => try printer(),
-        0x2 => try debug_printer(),
+        0x2 => try helpers(),
         else => unreachable,
     }
 }
@@ -107,17 +130,14 @@ fn printer() !void {
     try stdout.flush();
 }
 
-fn add_n_increment(x: u16, y: u16) u16 {
-    var z = x + y;
-    z += 1;
-    return z;
-}
-
-fn debug_printer() !void {
+fn helpers() !void {
     var stdout_buffer: [0x30]u8 = undefined;
     var stdout_writer = std.fs.File.stdout().writer(&stdout_buffer);
     const stdout = &stdout_writer.interface;
 
-    try stdout.print("Ther result of adding and incrementing 10 and 30 by one is: {d}\n", .{add_n_increment(10, 30)});
+    const number: i32 = 5;
+    std.debug.assert(@TypeOf(number) == i32);
+    try std.testing.expect(@TypeOf(number) == i32); //or
+    try stdout.print("{any}\n", .{@TypeOf(number)});
     try stdout.flush();
 }
