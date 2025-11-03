@@ -1,6 +1,6 @@
 const std = @import("std");
-const User = @import("structs/user.zig").User;
-const Vec3 = @import("structs/vect.zig").Vec3;
+const User = @import("../structs/user.zig").User;
+const Vec3 = @import("../structs/vect.zig").Vec3;
 const print = std.debug.print;
 
 /// # 2.  Control flow, structs, modules and types

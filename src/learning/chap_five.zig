@@ -1,5 +1,5 @@
 const std = @import("std");
-const User = @import("structs/user.zig").User;
+const User = @import("../structs/user.zig").User;
 ///  # 5 Pointers and Optionals
 /// In our next project we are going to build a HTTP server from scratch.
 /// But in order to do that, we need to learn more about pointers and how they work in Zig.
@@ -361,6 +361,7 @@ fn handling_optionals() !void {
 }
 
 fn return_null(n: i32) ?i32 {
+    // if divisible by 5 then return null
     if (@mod(n, 5) == 0) return null;
     return n;
 }
